@@ -34,7 +34,7 @@ final <- final %>% mutate(t = X + 1) %>% dplyr::select(-X)
 #mutate(Asset_1_BRet_3 = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),
 #       Asset_2_BRet_3 = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),
 #       Asset_3_BRet_3 = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%
-#dyplr::select(Asset_1_BRet_3, Asset_2_BRet_3, Asset_3_BRet_3) %>%
+#dplyr::select(Asset_1_BRet_3, Asset_2_BRet_3, Asset_3_BRet_3) %>%
 #mutate(t = 1:nrow(.))
 
 ############# code for h = 10
@@ -43,7 +43,7 @@ final <- final %>% mutate(t = X + 1) %>% dplyr::select(-X)
 #mutate(Asset_1_BRet_10 = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),
 #       Asset_2_BRet_10 = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),
 #       Asset_3_BRet_10 = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%
-#dyplr::select(Asset_1_BRet_10, Asset_2_BRet_10, Asset_3_BRet_10) %>%
+#dplyr::select(Asset_1_BRet_10, Asset_2_BRet_10, Asset_3_BRet_10) %>%
 #mutate(t = 1:nrow(.))
 
 ############# code for h = 30
@@ -52,12 +52,12 @@ final <- final %>% mutate(t = X + 1) %>% dplyr::select(-X)
 #mutate(Asset_1_BRet_30 = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),
 #       Asset_2_BRet_30 = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),
 #       Asset_3_BRet_30 = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%
-#dyplr::select(Asset_1_BRet_30, Asset_2_BRet_30, Asset_3_BRet_30) %>%
+#dplyr::select(Asset_1_BRet_30, Asset_2_BRet_30, Asset_3_BRet_30) %>%
 #mutate(t = 1:nrow(.))
 
 #BRet_full <- left_join(BRet_3, BRet_10, by="t") %>%
 #left_join(BRet_30, by="t") %>%
-#dyplr::select(-t)
+#dplyr::select(-t)
 
 #write.csv(BRet_full, 'bret.csv', row.names=FALSE)
 
@@ -78,7 +78,7 @@ BRet_full <- read.csv('bret.csv')
 
 #Rho <- BRet_full %>%
 #  mutate(t = 1:nrow(.)) %>%
-#  dyplr::select(t, Asset_1_BRet_3, Asset_2_BRet_3, Asset_3_BRet_3)
+#  dplyr::select(t, Asset_1_BRet_3, Asset_2_BRet_3, Asset_3_BRet_3)
 
 
 #w = 21*24*60
@@ -115,9 +115,9 @@ f_10 <- final %>% mutate(t = ifelse(t + 10 < nrow(final), t + 10, nrow(final))) 
   mutate(Asset_1_BRet_10f = round((Asset_1.y - Asset_1.x)/Asset_1.x, 4),
          Asset_2_BRet_10f = round((Asset_2.y - Asset_2.x)/Asset_2.x, 4),
          Asset_3_BRet_10f = round((Asset_3.y - Asset_3.x)/Asset_3.x, 4)) %>%
-  dyplr::select(Asset_1_BRet_10f, Asset_2_BRet_10f, Asset_3_BRet_10f) %>%
+  dplyr::select(Asset_1_BRet_10f, Asset_2_BRet_10f, Asset_3_BRet_10f) %>%
   mutate(t = 1:nrow(.)) %>%
-  dyplr::select(t, everything())
+  dplyr::select(t, everything())
 
 # adding the 10 minute forward return of Asset 1 into bret data
 bret_2.3 <- BRet_full %>% mutate(Asset_1_BRet_10f = f_10$Asset_1_BRet_10f)
@@ -173,6 +173,10 @@ Rho2.3_corr <- Rho2.3 %>% dplyr::select(t, Asset_1_BRet_10f, Asset_1_BRet_10f.pr
 ### write.csv(Rho2.3_corr, 'Rho2.3_corr.csv')
 ########
 
+# the above for-loop takes a bit to run so I just use the read in the resulting
+# csv file instead of rerunning it everytime I open up my code
+Rho2.3_corr <- read.csv('Rho2.3_corr.csv')
+
 # plot of 3-week rolling back correlations over the whole year
 Rho2.3_corr %>% 
   filter(Rho_10f_10f > -0.1) %>%
@@ -216,24 +220,90 @@ for (i in 1:length(k_vals)) {
 #################################################
 
 ##### Trying to make the KNN run faster
+##### Using subset of first 1440 rows to accomplish this (one day) 
+##### since the full data set takes too long
 
 # creating knn function to then use "map" to get errors
 knn_fun <- function(x) {
-  knn_pred_train <- knn.reg(train = trainX2.4, 
-                            test = trainX2.4, 
-                            y = train2.3$Asset_1_BRet_10f, 
+  knn_pred_train <- knn.reg(train = trainX2.4[1:1440,], 
+                            test = trainX2.4[1:1440,], 
+                            y = train2.3$Asset_1_BRet_10f[1:1440], 
                             k = x)
-  knn_pred_test <- knn.reg(train = trainX2.4, 
-                           test = testX2.4, 
-                           y = train2.3$Asset_1_BRet_10f, 
+  knn_pred_test <- knn.reg(train = trainX2.4[1:1440,], 
+                           test = testX2.4[1:1440,], 
+                           y = train2.3$Asset_1_BRet_10f[1:1440], 
                            k = x)
   
-  return(list(mean((train2.3$Asset_1_BRet_10f - knn_pred_train$pred)^2), # train MSE
-              mean((test2.3$Asset_1_BRet_10f - knn_pred_test$pred)^2)))  # test MSE
+  tibble(k = x,
+         train = mean((train2.3[1:1440,]$Asset_1_BRet_10f - knn_pred_train$pred)^2), # train MSE
+         test = mean((test2.3[1:1440,]$Asset_1_BRet_10f - knn_pred_test$pred)^2))  # test MSE
 }
 
-# mapping knn_fun over all of the k_vals
-k_vals %>% map(knn_fun)
+# trying to come up with ways to speed up the proccess...
+# it seems like the `$predict` part of knn.reg is reallyyyyyy slow...
+# placing it in a tibble does not speed it up
+# not sure how to speed it up honestly
+
+# running the `microbenchmark` function on knn_fun vs. knn_fun2 resulted in knn_fun being faster
+
+knn_fun2 <- function(x) {
+  knn_pred_train <- knn.reg(train = trainX2.4[1:1440,], 
+                            test = trainX2.4[1:1440,], 
+                            y = train2.3$Asset_1_BRet_10f[1:1440], 
+                            k = x)
+  knn_pred_test <- knn.reg(train = trainX2.4[1:1440,], 
+                           test = testX2.4[1:1440,], 
+                           y = train2.3$Asset_1_BRet_10f[1:1440], 
+                           k = x)
+  list(knntrainmse = dplyr::select(train2.3[1:1440,], Asset_1_BRet_10f) %>% mutate(Asset_1_BRet_10f.knn = knn_pred_train$pred) %>%
+         mutate(mse = (Asset_1_BRet_10f - Asset_1_BRet_10f.knn)^2) %>% as.tibble %>% .$mse %>% mean,
+       knntestmse = dplyr::select(test2.3[1:440,], Asset_1_BRet_10f) %>% mutate(Asset_1_BRet_10f.knn = knn_pred_test$pred) %>%
+         mutate(mse = (Asset_1_BRet_10f - Asset_1_BRet_10f.knn)^2) %>% as.tibble %>% .$mse %>% mean)
+}
+
+### mapping knn_fun over all of the k_vals
+#mse_knn <- k_vals %>% map(knn_fun)
+
+###### using this to check the speed of the two functions
+library(microbenchmark)
+#####
+
+# testing the speed of the functions against one another
+k_vals_test <- c(5, 25, 125, 625, 1000)
+
+# checking speed
+microbenchmark(
+  k_vals_test %>% map(knn_fun)
+)
+
+knn_dfs <- k_vals_test %>% map(knn_fun)
+
+val.mse.knn <- c()
+for(i in 1:5) {
+  val.mse.knn[i] <- knn_dfs[[i]]$test
+}
+best_k <- k_vals_test[which.min(val.mse.knn)]
+
+# checking correlation with the next day (1440 minutes)
+knn_pred_test_best <- knn.reg(train = trainX2.4[1441:2881,], 
+                         test = testX2.4[1441:2881,], 
+                         y = train2.3$Asset_1_BRet_10f[1441:2881], 
+                         k = best_k)
+
+cor(test2.3[1441:2881,]$Asset_1_BRet_10f, knn_pred_test_best[["pred"]])
+
+
+
+
+########################################
+##### Advanced Part
+########################################
+
+cor(final$Asset_1, final$Asset_3)
+
+final[1:1440,] %>% ggplot(aes(x = t, y = Asset_1)) +
+  geom_line()
+
 
 
 
