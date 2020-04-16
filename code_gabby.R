@@ -12,6 +12,7 @@ library(ISLR)
 library(MASS)
 library(FNN)
 library(glmnet)
+library(pls)
 
 # reading final_project.csv
 final <- read.csv('final_project.csv')
@@ -301,7 +302,7 @@ knn_pred_test_best <- knn.reg(train = trainX2.4[1441:2881,],
 cor(test2.3[1441:2881,]$Asset_1_BRet_10f, knn_pred_test_best[["pred"]])
 
 #########################################
-##### Problem 2.5
+##### Problem 2.5 - Ridge & Lasso
 #########################################
 horizons <- c(60,120,180,240,360,480,600,720,960,1200,1440)
 backwards_return <- function(h) { 
@@ -372,6 +373,38 @@ cor(y[train_id], predict(lasso.mod, s=best_lambda_lasso, newx=X[train_id,]))
 # out-of-sample correlation
 cor(y[-train_id], predict(lasso.mod, s=best_lambda_lasso, newx=X[-train_id,]))
 
+#########################################
+##### Problem 2.6 - PCR
+#########################################
+### Not sure if I'm supposed to use cv when I'm training this but I get the same answer either way and cv takes longer
+# PCR_cv <- pcr(Asset_1_BRet_10f ~ ., data = bret_2.5, subset = train_id, scale = TRUE, validation = "CV")
+# summary(PCR_cv)
+# 
+# PCR_cv.pred <- predict(PCR_cv, bret_2.5[-train_id, -43])
+# PCR_cv.pred <- as.data.frame(PCR_cv.pred)
+# PCR_cv_val_MSE <- lapply(1:42, function(i) mean((PCR_cv.pred[,i] - bret_2.5[-train_id, 43])^2))
+# optimal_pc_cv = which.min(PCR_cv_val_MSE)
+# 
+# # in-sample correlation
+# cor(y[train_id], predict(PCR_cv, bret_2.5[train_id, -43], ncomp=optimal_pc_cv))
+# 
+# # out-of-sample correlation
+# cor(y[-train_id], predict(PCR_cv, bret_2.5[-train_id, -43], ncomp=optimal_pc_cv))
+
+
+PCR <- pcr(Asset_1_BRet_10f ~ ., data = bret_2.5, subset = train_id, scale = TRUE)
+summary(PCR)
+
+PCR.pred <- predict(PCR, bret_2.5[-train_id, -43])
+PCR.pred <- as.data.frame(PCR.pred)
+PCR_val_MSE <- lapply(1:42, function(i) mean((PCR.pred[,i] - bret_2.5[-train_id, 43])^2))
+optimal_pc = which.min(PCR_val_MSE)
+
+# in-sample correlation
+cor(y[train_id], predict(PCR, bret_2.5[train_id, -43], ncomp=optimal_pc))
+
+# out-of-sample correlation
+cor(y[-train_id], predict(PCR, bret_2.5[-train_id, -43], ncomp=optimal_pc))
 
 
 ########################################
