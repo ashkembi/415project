@@ -11,6 +11,7 @@ library(tidyverse)
 library(ISLR)
 library(MASS)
 library("FNN")
+library(glmnet)
 
 # reading final_project.csv
 final <- read.csv('final_project.csv')
@@ -286,13 +287,83 @@ best_k <- k_vals_test[which.min(val.mse.knn)]
 
 # checking correlation with the next day (1440 minutes)
 knn_pred_test_best <- knn.reg(train = trainX2.4[1441:2881,], 
-                         test = testX2.4[1441:2881,], 
-                         y = train2.3$Asset_1_BRet_10f[1441:2881], 
-                         k = best_k)
+                              test = testX2.4[1441:2881,], 
+                              y = train2.3$Asset_1_BRet_10f[1441:2881], 
+                              k = best_k)
 
 cor(test2.3[1441:2881,]$Asset_1_BRet_10f, knn_pred_test_best[["pred"]])
 
+#########################################
+##### Problem 2.5
+#########################################
+horizons <- c(60,120,180,240,360,480,600,720,960,1200,1440)
+backwards_return <- function(h) { 
+  BRet_h <- final %>% mutate(t = ifelse(t - h < 1, 1, t-h)) %>%
+    left_join(final, by = "t") %>%
+    mutate(Asset_1_BRet_h = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),
+           Asset_2_BRet_h = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),
+           Asset_3_BRet_h = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%
+    dplyr::select(Asset_1_BRet_h, Asset_2_BRet_h, Asset_3_BRet_h) %>%
+    mutate(t = 1:nrow(.))
+  
+  return (BRet_h)
+}
+BRet_2_5 <- sapply(horizons, backwards_return)
+BRet_2_5[c(1:11)*4] <- NULL
+BRet_full[, c("Asset_1_BRet_60", "Asset_2_BRet_60", "Asset_3_BRet_60",
+              "Asset_1_BRet_120", "Asset_2_BRet_120", "Asset_3_BRet_120", 
+              "Asset_1_BRet_180", "Asset_2_BRet_180", "Asset_3_BRet_180",
+              "Asset_1_BRet_240", "Asset_2_BRet_240", "Asset_3_BRet_240",
+              "Asset_1_BRet_360", "Asset_2_BRet_360", "Asset_3_BRet_360", 
+              "Asset_1_BRet_480", "Asset_2_BRet_480", "Asset_3_BRet_480",
+              "Asset_1_BRet_600", "Asset_2_BRet_600", "Asset_3_BRet_600",
+              "Asset_1_BRet_720", "Asset_2_BRet_720", "Asset_3_BRet_720",
+              "Asset_1_BRet_960", "Asset_2_BRet_960", "Asset_3_BRet_960",
+              "Asset_1_BRet_1200", "Asset_2_BRet_1200", "Asset_3_BRet_1200",
+              "Asset_1_BRet_1440", "Asset_2_BRet_1440", "Asset_3_BRet_1440")] <- BRet_2_5
 
+# write.csv(BRet_full, 'bret_2_5.csv', row.names=FALSE)
+# adding the 10 minute forward return of Asset 1 into bret data
+bret_2.5 <- BRet_full %>% mutate(Asset_1_BRet_10f = f_10$Asset_1_BRet_10f)
+
+X = model.matrix(Asset_1_BRet_10f ~ ., bret_2.5)[, -1]
+y <- bret_2.5$Asset_1_BRet_10f
+
+
+## Ridge Regression
+ridge.mod = glmnet(X[train_id,], y[train_id], alpha=0)
+summary(ridge.mod)
+
+# Ridge: validation MSEs
+ridge.pred_test = predict(ridge.mod,newx=X[-train_id,])
+
+val_MSEs_ridge <- lapply(1:100, function(i) mean((ridge.pred_test[,i]-y[-train_id])^2))
+
+best_lambda_ridge = ridge.mod$lambda[which.min(val_MSEs_ridge)]
+
+# in-sample correlation
+cor(y[train_id], predict(ridge.mod, s=best_lambda_ridge ,newx=X[train_id,]))
+
+# out-of-sample correlation
+cor(y[-train_id], predict(ridge.mod, s=best_lambda_ridge ,newx=X[-train_id,]))
+
+
+## LASSO Regression
+lasso.mod = glmnet(X[train_id,], y[train_id], alpha=1)
+summary(lasso.mod)
+
+# LASSO: validation MSEs
+lasso.pred_test = predict(lasso.mod,newx=X[-train_id,])
+
+val_MSEs_lasso <- lapply(1:86, function(i) mean((lasso.pred_test[,i]-y[-train_id])^2))
+
+best_lambda_lasso = lasso.mod$lambda[which.min(val_MSEs_lasso)]
+
+# in-sample correlation
+cor(y[train_id], predict(lasso.mod, s=best_lambda_lasso, newx=X[train_id,]))
+
+# out-of-sample correlation
+cor(y[-train_id], predict(lasso.mod, s=best_lambda_lasso, newx=X[-train_id,]))
 
 
 ########################################
@@ -304,19 +375,199 @@ cor(final$Asset_1, final$Asset_3)
 final[1:1440,] %>% ggplot(aes(x = t, y = Asset_1)) +
   geom_line()
 
+days <- list()
+for (i in 1:(524160/1440)){
+  j = 1440
+  
+  if(i == 1){
+    initial = 1
+  } else {
+    initial = ((i-1)*1440) + 1
+  }
+  
+  end = i*1440
+  
+  days[[i]] <- seq(initial, end, by = 1)
+}
+
+final[days[[2]],]
+
+final[days[[1]],]
+
+day1 <- final[days[[1]],] %>% mutate(t = 1:nrow(.))
+
+returns_df <- function(df) {
+  df %>%
+    mutate(t = 1:nrow(df)) %>%
+    as.tibble %>%
+    mutate(t = ifelse(t + 10 < nrow(df), t + 10, nrow(df))) %>% # h = 10
+    left_join(mutate(df, t = 1:nrow(df)), by="t") %>%
+    mutate(Asset_1_BRet_10f = round((Asset_1.y - Asset_1.x)/Asset_1.x, 4),
+           Asset_2_BRet_10f = round((Asset_2.y - Asset_2.x)/Asset_2.x, 4),
+           Asset_3_BRet_10f = round((Asset_3.y - Asset_3.x)/Asset_3.x, 4)) %>%
+    dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y) %>%
+    mutate(t = 1:nrow(df)) %>%
+    mutate(t = ifelse(t - 10 < 1, 1, t-10)) %>%
+    rename("Asset_1" = Asset_1.x, "Asset_2" = Asset_2.x, "Asset_3" = Asset_3.x) %>%
+    left_join(mutate(df, t = 1:nrow(df)), by="t") %>%
+    mutate(Asset_1_BRet_10b = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),
+           Asset_2_BRet_10b = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),
+           Asset_3_BRet_10b = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%
+    dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y, -t) %>%
+    as.tibble() %>%
+    return()
+}
+
+returns_df(final[days[[201]],]) %>%
+  lm(Asset_1_BRet_10f ~ I(Asset_2_BRet_10f)*I(Asset_3_BRet_10f) + I(Asset_1_BRet_10b)*I(Asset_2_BRet_10b) +
+       Asset_1.x*Asset_3.x, data=.) %>%
+  summary() %>%
+  
+  returns_df(final[days[[190]],]) %>%
+  ggplot(aes(x = t, y = Asset_1_BRet_10f)) +
+  geom_line()
+
+set.seed(816)
+train_id_day1 <- sample(1:nrow(day1), trunc(0.7*nrow(day1)))
+day1_train <- day1[train_id_day1,]
+day1_test <- day1[-train_id_day1,]
+
+day1X <- model.matrix(`Accept/Apps` ~ ., data = College)[,-1]
+day1y <- day1$
+  
+  test_ids <- sample(1:nrow(College), trunc(0.3*nrow(College)))
+
+day1X_train <- X[-test_ids,]
+day1Xtest <- X[test_ids,]
+day1ytrain <- y[-test_ids]
+day1ytest <- y[test_ids]
+
+#ridge
+grid <- 10^seq(10, -2, length=100)
+cv.ridge <- cv.glmnet(x = day1_train, y = ytrain,
+                      alpha = 0, lambda = grid)
 
 
 
+final[days[[200]],] %>% ggplot(aes(x = t, y = Asset_1)) +
+  geom_line()
+
+final[days[[200]],] %>% ggplot(aes(x = t, y = Asset_2)) +
+  geom_line()
+
+cor(final[days[[190]],]$Asset_1, final[days[[190]],]$Asset_2)
+
+
+#### trees
+
+returns_df(final[days[[190]],])
+
+tree_fun <- function(df) {
+  set.seed(1)
+  train <- sample(1:nrow(df), nrow(df/2))
+  tree.trial <- tree(Asset_1_BRet_10f ~., df)
+  
+  numleaves <- nrow(subset(tree.trial$frame, var =='<leaf>'))
+  predict(tree.trial)
+  #return(cor(predict(tree.trial) %>% as.vector, df$Asset_1_BRet_10f))
+}
+library(tree)
+
+cor_tree_trials <- c()
+for(i in 1:100) {
+  df <- trial_dfs[[i]]
+  cor_tree_trials[i] <- 
+}
+
+cor_tree_trials
+tree_fun(trial_dfs[[2]])
+
+trial_dfs <- list()
+for(i in 1:364) {
+  trial_dfs[[i]] <- returns_df(final[days[[i]],])
+}
+
+trial_dfs[[2]]
 
 
 
+set.seed(1)
+df_trial <- returns_df(final[days[[257]],])
+train <- sample(1:nrow(df_trial), nrow(df_trial/2))
+tree.trial <- tree(Asset_1_BRet_10f ~ Asset_3_BRet_10f + Asset_2_BRet_10f + Asset_1.x + Asset_3.x + Asset_2.x, df_trial)
+cv.trial <- cv.tree(tree.trial)
+tree.trial.final <- prune.tree(tree.trial, best=cv.trial$size[which.min(cv.trial$dev)])
+
+summary(tree.trial.final)
+cor(predict(tree.trial.final) %>% as.vector, df_trial$Asset_1_BRet_10f)
+
+prediction <- function(df) {
+  lol <- final[days[[190]],] %>%
+    mutate(t = 1:nrow(final[days[[190]],])) %>%
+    as.tibble %>%
+    mutate(t = ifelse(t + 10 < nrow(final[days[[190]],]), t + 10, nrow(final[days[[190]],]))) %>% # h = 10
+    left_join(mutate(final[days[[190]],], t = 1:nrow(final[days[[190]],])), by="t") %>%
+    mutate(Asset_1_BRet_10f = round((Asset_1.y - Asset_1.x)/Asset_1.x, 4),
+           Asset_2_BRet_10f = round((Asset_2.y - Asset_2.x)/Asset_2.x, 4),
+           Asset_3_BRet_10f = round((Asset_3.y - Asset_3.x)/Asset_3.x, 4)) %>%
+    dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y) %>%
+    mutate(t = 1:nrow(final[days[[190]],])) %>%
+    mutate(t = ifelse(t - 10 < 1, 1, t-10)) %>%
+    rename("Asset_1" = Asset_1.x, "Asset_2" = Asset_2.x, "Asset_3" = Asset_3.x) %>%
+    left_join(mutate(final[days[[190]],], t = 1:nrow(final[days[[190]],])), by="t") %>%
+    mutate(Asset_1_BRet_10b = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),
+           Asset_2_BRet_10b = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),
+           Asset_3_BRet_10b = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%
+    dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y, -t) %>%
+    as.tibble() %>%
+    return()
+  
+  tree.trial <- tree(Asset_1_BRet_10f ~ Asset_3_BRet_10f + Asset_2_BRet_10f + Asset_1.x + Asset_3.x + Asset_2.x, lol)
+  cv.trial <- cv.tree(tree.trial)
+  tree.trial.final <- prune.tree(tree.trial, best=cv.trial$size[which.min(cv.trial$dev)])
+  predict(tree.trial.final)[length(predict(tree.trial.final))] %>% as.vector
+}
+
+predict(final[days[[190]],])
 
 
 
+#####################
 
 
+prediction <- function(dataframe) {
+  update <- dataframe %>%
+    mutate(t = 1:nrow(dataframe)) %>%
+    as.tibble %>%
+    mutate(t = ifelse(t + 10 < nrow(dataframe), t + 10, nrow(dataframe))) %>% # h = 10
+    left_join(mutate(dataframe, t = 1:nrow(df)), by="t") %>%
+    mutate(Asset_1_BRet_10f = round((Asset_1.y - Asset_1.x)/Asset_1.x, 4),
+           Asset_2_BRet_10f = round((Asset_2.y - Asset_2.x)/Asset_2.x, 4),
+           Asset_3_BRet_10f = round((Asset_3.y - Asset_3.x)/Asset_3.x, 4)) %>%
+    dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y) %>%
+    mutate(t = 1:nrow(dataframe)) %>%
+    mutate(t = ifelse(t - 10 < 1, 1, t-10)) %>%
+    rename("Asset_1" = Asset_1.x, "Asset_2" = Asset_2.x, "Asset_3" = Asset_3.x) %>%
+    left_join(mutate(dataframe, t = 1:nrow(df)), by="t") %>%
+    mutate(Asset_1_BRet_10b = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),
+           Asset_2_BRet_10b = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),
+           Asset_3_BRet_10b = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%
+    dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y, -t) %>%
+    as.tibble()
+  
+  load("model.RData")
+  predict(tree.trial.final)[length(predict(tree.trial.final))] %>% as.vector
+}
 
 
+#######################
 
+tree.trial <- tree(Asset_1_BRet_10f ~ Asset_3_BRet_10f + Asset_2_BRet_10f + Asset_1.x + Asset_3.x + Asset_2.x, update)
+cv.trial <- cv.tree(tree.trial)
+tree.trial.final <- prune.tree(tree.trial, best=cv.trial$size[which.min(cv.trial$dev)])
 
+save(tree.trial, cv.trial, tree.trial.final, 'model.RData')
 
+library(tree)
+
+prediction(final[1:1440,])

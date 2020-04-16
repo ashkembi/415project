@@ -24,3 +24,4 @@ prediction <- function(dataframe) {
   
   predict(tree.trial.final)[length(predict(tree.trial.final))] %>% as.vector
 }
+

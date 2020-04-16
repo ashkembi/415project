@@ -1,0 +1,577 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1561
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 ##############################################################################\
+#   STATS 415 Final Project\
+##############################################################################\
+\
+\
+# setting working directory\
+setwd('/Users/abasshkembi/Downloads/UMICH\\ Classes/2019-2020/W20/STATS\\ 415/project/')\
+\
+# packages\
+library(tidyverse)\
+library(ISLR)\
+library(MASS)\
+library("FNN")\
+library(glmnet)\
+\
+# reading final_project.csv\
+final <- read.csv('final_project.csv')\
+# creating t variable, which is the minute\
+final <- final %>% mutate(t = X + 1) %>% dplyr::select(-X)\
+\
+#########################################\
+##### Problem 2.1\
+#########################################\
+\
+\
+### I currently have this code commented out because it's just easier to\
+### read in the resulting csv created from this code each time\
+\
+\
+######\
+\
+############# code for h = 3\
+#BRet_3 <- final %>% mutate(t = ifelse(t - 3 < 1, 1, t-3)) %>%\
+#left_join(final, by="t") %>%\
+#mutate(Asset_1_BRet_3 = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),\
+#       Asset_2_BRet_3 = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),\
+#       Asset_3_BRet_3 = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%\
+#dplyr::select(Asset_1_BRet_3, Asset_2_BRet_3, Asset_3_BRet_3) %>%\
+#mutate(t = 1:nrow(.))\
+\
+############# code for h = 10\
+#BRet_10 <- final %>% mutate(t = ifelse(t - 10 < 1, 1, t-10)) %>% # h = 10\
+#left_join(final, by = "t") %>%\
+#mutate(Asset_1_BRet_10 = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),\
+#       Asset_2_BRet_10 = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),\
+#       Asset_3_BRet_10 = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%\
+#dplyr::select(Asset_1_BRet_10, Asset_2_BRet_10, Asset_3_BRet_10) %>%\
+#mutate(t = 1:nrow(.))\
+\
+############# code for h = 30\
+#BRet_30 <- final %>% mutate(t = ifelse(t - 30 < 1, 1, t-30)) %>% # h = 30\
+#left_join(final, by = "t") %>%\
+#mutate(Asset_1_BRet_30 = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),\
+#       Asset_2_BRet_30 = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),\
+#       Asset_3_BRet_30 = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%\
+#dplyr::select(Asset_1_BRet_30, Asset_2_BRet_30, Asset_3_BRet_30) %>%\
+#mutate(t = 1:nrow(.))\
+\
+#BRet_full <- left_join(BRet_3, BRet_10, by="t") %>%\
+#left_join(BRet_30, by="t") %>%\
+#dplyr::select(-t)\
+\
+#write.csv(BRet_full, 'bret.csv', row.names=FALSE)\
+\
+######\
+\
+# reading in resulting csv from 2.1\
+BRet_full <- read.csv('bret.csv')\
+\
+\
+####################################\
+##### Problem 2.2\
+####################################\
+\
+\
+### I currently have this code commented out because it's just easier to\
+### read in the resulting csv created from this code each time\
+\
+\
+#Rho <- BRet_full %>%\
+#  mutate(t = 1:nrow(.)) %>%\
+#  dplyr::select(t, Asset_1_BRet_3, Asset_2_BRet_3, Asset_3_BRet_3)\
+\
+\
+#w = 21*24*60\
+#Rho_1_2 <- vector(length = nrow(final))\
+#Rho_1_3 <- vector(length = nrow(final))\
+#Rho_2_3 <- vector(length = nrow(final))\
+\
+#for(i in 1:nrow(BRet_full))\{\
+#  min_t = ifelse(Rho$t[i] - w < 1, 1, Rho$t[i] - w)\
+#  max_t = Rho$t[i]\
+\
+#  Asset_1 <- Rho$Asset_1_BRet_3[min_t:max_t]\
+#  Asset_2 <- Rho$Asset_2_BRet_3[min_t:max_t]\
+#  Asset_3 <- Rho$Asset_3_BRet_3[min_t:max_t]\
+\
+#  Rho_1_2[i] <- round(cor(Asset_1, Asset_2), 4)\
+#  Rho_1_3[i] <- round(cor(Asset_1, Asset_3), 4)\
+#  Rho_2_3[i] <- round(cor(Asset_2, Asset_3), 4)\
+#\}\
+\
+#Rho_corr <- tibble(Rho_1_2, Rho_1_3, Rho_2_3)\
+\
+#write.csv(Rho_corr, 'corr.csv', row.names=FALSE)\
+\
+\
+\
+#########################################\
+##### Problem 2.3\
+#########################################\
+\
+\
+f_10 <- final %>% mutate(t = ifelse(t + 10 < nrow(final), t + 10, nrow(final))) %>% # h = 10\
+  left_join(final, by="t") %>%\
+  mutate(Asset_1_BRet_10f = round((Asset_1.y - Asset_1.x)/Asset_1.x, 4),\
+         Asset_2_BRet_10f = round((Asset_2.y - Asset_2.x)/Asset_2.x, 4),\
+         Asset_3_BRet_10f = round((Asset_3.y - Asset_3.x)/Asset_3.x, 4)) %>%\
+  dplyr::select(Asset_1_BRet_10f, Asset_2_BRet_10f, Asset_3_BRet_10f) %>%\
+  mutate(t = 1:nrow(.)) %>%\
+  dplyr::select(t, everything())\
+\
+# adding the 10 minute forward return of Asset 1 into bret data\
+bret_2.3 <- BRet_full %>% mutate(Asset_1_BRet_10f = f_10$Asset_1_BRet_10f)\
+\
+### creating train and test df\
+set.seed(816)\
+train_id <- sample(1:nrow(bret_2.3), trunc(0.7*nrow(bret_2.3)))\
+train2.3 <- bret_2.3[train_id,]\
+test2.3 <- bret_2.3[-train_id,]\
+###\
+\
+# linear model\
+mod2.3 <- lm(Asset_1_BRet_10f ~ ., data = train2.3)\
+summary(mod2.3)\
+# we see that Asset_2_BRet_3, Asset_3_BRet_3, Asset_2_BRet_10, Asset_3_BRet_10, and Asset_2_BRet_30 are all significant \
+# predictors, while only Asset_3_BRet_30 is not for asset 3\
+\
+# prediction, creating new variable in each dataset with prediction\
+train2.3_pred <- train2.3 %>% mutate(Asset_1_BRet_10f.pred = predict(mod2.3, train2.3))\
+test2.3_pred <- test2.3 %>% mutate(Asset_1_BRet_10f.pred = predict(mod2.3, test2.3))\
+\
+# in-sample correlation\
+cor(train2.3$Asset_1_BRet_10f, train2.3_pred$Asset_1_BRet_10f.pred)\
+\
+# out-of-sample correlation\
+cor(test2.3$Asset_1_BRet_10f, test2.3_pred$Asset_1_BRet_10f.pred)\
+\
+# 3-week backward correlation between Asset_1_BRet_10f and Asset_1_BRet_10f.pred\
+Rho2.3 <- rbind(train2.3_pred, test2.3_pred) %>% mutate(t = 1:nrow(.))\
+\
+# 3-weeks in minutes\
+w = 21*24*60\
+#initializing new vector\
+Rho_10f_10f.pred <- vector(length = nrow(final))\
+\
+for(i in 1:nrow(final))\{\
+  min_t = ifelse(Rho2.3$t[i] - w < 1, 1, Rho2.3$t[i] - w) # minumum t to select (3-weeks ago)\
+  max_t = Rho2.3$t[i]                                     # maximum t (current time)\
+  \
+  #vector of Asset_1_BRet_10f from minute "min_t" to minute "max_t"\
+  Asset_1_BRet_10f <- Rho2.3$Asset_1_BRet_10f[min_t:max_t]\
+  #vector of Asset_1_BRet_10f.pred from minute "min_t" to minute "max_t"\
+  Asset_1_BRet_10f.pred <- Rho2.3$Asset_1_BRet_10f.pred[min_t:max_t]\
+  \
+  # store correlation between Asset_1_BRet_10f and Asset_1_BRet_10f.pred from min_t to max_t\
+  Rho_10f_10f.pred[i] <- round(cor(Asset_1_BRet_10f, Asset_1_BRet_10f.pred), 4)\
+\}\
+\
+Rho2.3_corr <- Rho2.3 %>% dplyr::select(t, Asset_1_BRet_10f, Asset_1_BRet_10f.pred) %>%\
+  mutate(Rho_10f_10f = Rho_10f_10f.pred)\
+\
+########\
+### write.csv(Rho2.3_corr, 'Rho2.3_corr.csv')\
+########\
+\
+# the above for-loop takes a bit to run so I just use the read in the resulting\
+# csv file instead of rerunning it everytime I open up my code\
+Rho2.3_corr <- read.csv('Rho2.3_corr.csv')\
+\
+# plot of 3-week rolling back correlations over the whole year\
+Rho2.3_corr %>% \
+  filter(Rho_10f_10f > -0.1) %>%\
+  ggplot() +\
+  geom_line(aes(x = t, y = Rho_10f_10f)) +\
+  theme_bw()\
+\
+\
+#########################################\
+##### Problem 2.4\
+#########################################\
+\
+# create train and test set for 2.4 in matrices\
+trainX2.4 <- as.matrix(train2.3[-length(colnames(train2.3))]) # removing Asset_1_BRet_10f\
+testX2.4 <- as.matrix(test2.3[-length(colnames(test2.3))]) # removing Asset_1_BRet_10f\
+\
+#set values of K\
+k_vals <- c(5, 25, 125, 625, 1000)\
+\
+###############################################\
+\
+##### This should work (as I tried it with the first 100 rows) but takes several minutes to run\
+##### Try to find a new way to make it run faster\
+\
+# initializing new train and test MSE vectors\
+knnTrainErr <- vector(length = length(k_vals))\
+knnTestErr <- vector(length = length(k_vals))\
+for (i in 1:length(k_vals)) \{\
+  knn_pred_train <- knn.reg(train = trainX2.4, \
+                            test = trainX2.4, \
+                            y = train2.3$Asset_1_BRet_10f, \
+                            k = k_vals[i])\
+  knn_pred_test <- knn.reg(train = trainX2.4, \
+                           test = testX2.4, \
+                           y = train2.3$Asset_1_BRet_10f, \
+                           k = k_vals[i])\
+  \
+  knnTrainErr[i] <- mean((train2.3$Asset_1_BRet_10f - knn_pred_train$pred)^2)\
+  knnTestErr[i] <- mean((test2.3$Asset_1_BRet_10f - knn_pred_test$pred)^2)\
+\}\
+#################################################\
+\
+##### Trying to make the KNN run faster\
+##### Using subset of first 1440 rows to accomplish this (one day) \
+##### since the full data set takes too long\
+\
+# creating knn function to then use "map" to get errors\
+knn_fun <- function(x) \{\
+  knn_pred_train <- knn.reg(train = trainX2.4[1:1440,], \
+                            test = trainX2.4[1:1440,], \
+                            y = train2.3$Asset_1_BRet_10f[1:1440], \
+                            k = x)\
+  knn_pred_test <- knn.reg(train = trainX2.4[1:1440,], \
+                           test = testX2.4[1:1440,], \
+                           y = train2.3$Asset_1_BRet_10f[1:1440], \
+                           k = x)\
+  \
+  tibble(k = x,\
+         train = mean((train2.3[1:1440,]$Asset_1_BRet_10f - knn_pred_train$pred)^2), # train MSE\
+         test = mean((test2.3[1:1440,]$Asset_1_BRet_10f - knn_pred_test$pred)^2))  # test MSE\
+\}\
+\
+# trying to come up with ways to speed up the proccess...\
+# it seems like the `$predict` part of knn.reg is reallyyyyyy slow...\
+# placing it in a tibble does not speed it up\
+# not sure how to speed it up honestly\
+\
+# running the `microbenchmark` function on knn_fun vs. knn_fun2 resulted in knn_fun being faster\
+\
+knn_fun2 <- function(x) \{\
+  knn_pred_train <- knn.reg(train = trainX2.4[1:1440,], \
+                            test = trainX2.4[1:1440,], \
+                            y = train2.3$Asset_1_BRet_10f[1:1440], \
+                            k = x)\
+  knn_pred_test <- knn.reg(train = trainX2.4[1:1440,], \
+                           test = testX2.4[1:1440,], \
+                           y = train2.3$Asset_1_BRet_10f[1:1440], \
+                           k = x)\
+  list(knntrainmse = dplyr::select(train2.3[1:1440,], Asset_1_BRet_10f) %>% mutate(Asset_1_BRet_10f.knn = knn_pred_train$pred) %>%\
+         mutate(mse = (Asset_1_BRet_10f - Asset_1_BRet_10f.knn)^2) %>% as.tibble %>% .$mse %>% mean,\
+       knntestmse = dplyr::select(test2.3[1:440,], Asset_1_BRet_10f) %>% mutate(Asset_1_BRet_10f.knn = knn_pred_test$pred) %>%\
+         mutate(mse = (Asset_1_BRet_10f - Asset_1_BRet_10f.knn)^2) %>% as.tibble %>% .$mse %>% mean)\
+\}\
+\
+### mapping knn_fun over all of the k_vals\
+#mse_knn <- k_vals %>% map(knn_fun)\
+\
+###### using this to check the speed of the two functions\
+library(microbenchmark)\
+#####\
+\
+# testing the speed of the functions against one another\
+k_vals_test <- c(5, 25, 125, 625, 1000)\
+\
+# checking speed\
+microbenchmark(\
+  k_vals_test %>% map(knn_fun)\
+)\
+\
+knn_dfs <- k_vals_test %>% map(knn_fun)\
+\
+val.mse.knn <- c()\
+for(i in 1:5) \{\
+  val.mse.knn[i] <- knn_dfs[[i]]$test\
+\}\
+best_k <- k_vals_test[which.min(val.mse.knn)]\
+\
+# checking correlation with the next day (1440 minutes)\
+knn_pred_test_best <- knn.reg(train = trainX2.4[1441:2881,], \
+                         test = testX2.4[1441:2881,], \
+                         y = train2.3$Asset_1_BRet_10f[1441:2881], \
+                         k = best_k)\
+\
+cor(test2.3[1441:2881,]$Asset_1_BRet_10f, knn_pred_test_best[["pred"]])\
+\
+#########################################\
+##### Problem 2.5\
+#########################################\
+horizons <- c(60,120,180,240,360,480,600,720,960,1200,1440)\
+backwards_return <- function(h) \{ \
+  BRet_h <- final %>% mutate(t = ifelse(t - h < 1, 1, t-h)) %>%\
+    left_join(final, by = "t") %>%\
+    mutate(Asset_1_BRet_h = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),\
+           Asset_2_BRet_h = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),\
+           Asset_3_BRet_h = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%\
+    dplyr::select(Asset_1_BRet_h, Asset_2_BRet_h, Asset_3_BRet_h) %>%\
+    mutate(t = 1:nrow(.))\
+  \
+  return (BRet_h)\
+\}\
+BRet_2_5 <- sapply(horizons, backwards_return)\
+BRet_2_5[c(1:11)*4] <- NULL\
+BRet_full[, c("Asset_1_BRet_60", "Asset_2_BRet_60", "Asset_3_BRet_60",\
+              "Asset_1_BRet_120", "Asset_2_BRet_120", "Asset_3_BRet_120", \
+              "Asset_1_BRet_180", "Asset_2_BRet_180", "Asset_3_BRet_180",\
+              "Asset_1_BRet_240", "Asset_2_BRet_240", "Asset_3_BRet_240",\
+              "Asset_1_BRet_360", "Asset_2_BRet_360", "Asset_3_BRet_360", \
+              "Asset_1_BRet_480", "Asset_2_BRet_480", "Asset_3_BRet_480",\
+              "Asset_1_BRet_600", "Asset_2_BRet_600", "Asset_3_BRet_600",\
+              "Asset_1_BRet_720", "Asset_2_BRet_720", "Asset_3_BRet_720",\
+              "Asset_1_BRet_960", "Asset_2_BRet_960", "Asset_3_BRet_960",\
+              "Asset_1_BRet_1200", "Asset_2_BRet_1200", "Asset_3_BRet_1200",\
+              "Asset_1_BRet_1440", "Asset_2_BRet_1440", "Asset_3_BRet_1440")] <- BRet_2_5\
+\
+# write.csv(BRet_full, 'bret_2_5.csv', row.names=FALSE)\
+# adding the 10 minute forward return of Asset 1 into bret data\
+bret_2.5 <- BRet_full %>% mutate(Asset_1_BRet_10f = f_10$Asset_1_BRet_10f)\
+\
+X = model.matrix(Asset_1_BRet_10f ~ ., bret_2.5)[, -1]\
+y <- bret_2.5$Asset_1_BRet_10f\
+\
+\
+## Ridge Regression\
+ridge.mod = glmnet(X[train_id,], y[train_id], alpha=0)\
+summary(ridge.mod)\
+\
+# Ridge: validation MSEs\
+ridge.pred_test = predict(ridge.mod,newx=X[-train_id,])\
+\
+val_MSEs_ridge <- lapply(1:100, function(i) mean((ridge.pred_test[,i]-y[-train_id])^2))\
+\
+best_lambda_ridge = ridge.mod$lambda[which.min(val_MSEs_ridge)]\
+\
+# in-sample correlation\
+cor(y[train_id], predict(ridge.mod, s=best_lambda_ridge ,newx=X[train_id,]))\
+\
+# out-of-sample correlation\
+cor(y[-train_id], predict(ridge.mod, s=best_lambda_ridge ,newx=X[-train_id,]))\
+\
+\
+## LASSO Regression\
+lasso.mod = glmnet(X[train_id,], y[train_id], alpha=1)\
+summary(lasso.mod)\
+\
+# LASSO: validation MSEs\
+lasso.pred_test = predict(lasso.mod,newx=X[-train_id,])\
+\
+val_MSEs_lasso <- lapply(1:86, function(i) mean((lasso.pred_test[,i]-y[-train_id])^2))\
+\
+best_lambda_lasso = lasso.mod$lambda[which.min(val_MSEs_lasso)]\
+\
+# in-sample correlation\
+cor(y[train_id], predict(lasso.mod, s=best_lambda_lasso, newx=X[train_id,]))\
+\
+# out-of-sample correlation\
+cor(y[-train_id], predict(lasso.mod, s=best_lambda_lasso, newx=X[-train_id,]))\
+\
+\
+########################################\
+##### Advanced Part\
+########################################\
+\
+cor(final$Asset_1, final$Asset_3)\
+\
+final[1:1440,] %>% ggplot(aes(x = t, y = Asset_1)) +\
+  geom_line()\
+\
+days <- list()\
+for (i in 1:(524160/1440))\{\
+  j = 1440\
+  \
+  if(i == 1)\{\
+    initial = 1\
+  \} else \{\
+    initial = ((i-1)*1440) + 1\
+  \}\
+\
+  end = i*1440\
+  \
+  days[[i]] <- seq(initial, end, by = 1)\
+\}\
+\
+final[days[[2]],]\
+\
+final[days[[1]],]\
+\
+day1 <- final[days[[1]],] %>% mutate(t = 1:nrow(.))\
+\
+returns_df <- function(df) \{\
+  df %>%\
+    mutate(t = 1:nrow(df)) %>%\
+    as.tibble %>%\
+    mutate(t = ifelse(t + 10 < nrow(df), t + 10, nrow(df))) %>% # h = 10\
+    left_join(mutate(df, t = 1:nrow(df)), by="t") %>%\
+    mutate(Asset_1_BRet_10f = round((Asset_1.y - Asset_1.x)/Asset_1.x, 4),\
+           Asset_2_BRet_10f = round((Asset_2.y - Asset_2.x)/Asset_2.x, 4),\
+           Asset_3_BRet_10f = round((Asset_3.y - Asset_3.x)/Asset_3.x, 4)) %>%\
+    dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y) %>%\
+    mutate(t = 1:nrow(df)) %>%\
+    mutate(t = ifelse(t - 10 < 1, 1, t-10)) %>%\
+    rename("Asset_1" = Asset_1.x, "Asset_2" = Asset_2.x, "Asset_3" = Asset_3.x) %>%\
+    left_join(mutate(df, t = 1:nrow(df)), by="t") %>%\
+    mutate(Asset_1_BRet_10b = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),\
+           Asset_2_BRet_10b = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),\
+           Asset_3_BRet_10b = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%\
+    dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y, -t) %>%\
+    as.tibble() %>%\
+    return()\
+\}\
+\
+returns_df(final[days[[201]],]) %>%\
+  lm(Asset_1_BRet_10f ~ I(Asset_2_BRet_10f)*I(Asset_3_BRet_10f) + I(Asset_1_BRet_10b)*I(Asset_2_BRet_10b) +\
+       Asset_1.x*Asset_3.x, data=.) %>%\
+  summary() %>%\
+\
+returns_df(final[days[[190]],]) %>%\
+  ggplot(aes(x = t, y = Asset_1_BRet_10f)) +\
+  geom_line()\
+\
+set.seed(816)\
+train_id_day1 <- sample(1:nrow(day1), trunc(0.7*nrow(day1)))\
+day1_train <- day1[train_id_day1,]\
+day1_test <- day1[-train_id_day1,]\
+\
+day1X <- model.matrix(`Accept/Apps` ~ ., data = College)[,-1]\
+day1y <- day1$\
+\
+test_ids <- sample(1:nrow(College), trunc(0.3*nrow(College)))\
+\
+day1X_train <- X[-test_ids,]\
+day1Xtest <- X[test_ids,]\
+day1ytrain <- y[-test_ids]\
+day1ytest <- y[test_ids]\
+\
+#ridge\
+grid <- 10^seq(10, -2, length=100)\
+cv.ridge <- cv.glmnet(x = day1_train, y = ytrain,\
+                      alpha = 0, lambda = grid)\
+\
+\
+\
+final[days[[200]],] %>% ggplot(aes(x = t, y = Asset_1)) +\
+  geom_line()\
+\
+final[days[[200]],] %>% ggplot(aes(x = t, y = Asset_2)) +\
+  geom_line()\
+\
+cor(final[days[[190]],]$Asset_1, final[days[[190]],]$Asset_2)\
+\
+\
+#### trees\
+\
+returns_df(final[days[[190]],])\
+\
+tree_fun <- function(df) \{\
+  set.seed(1)\
+  train <- sample(1:nrow(df), nrow(df/2))\
+  tree.trial <- tree(Asset_1_BRet_10f ~., df)\
+  \
+  numleaves <- nrow(subset(tree.trial$frame, var =='<leaf>'))\
+  predict(tree.trial)\
+  #return(cor(predict(tree.trial) %>% as.vector, df$Asset_1_BRet_10f))\
+\}\
+library(tree)\
+\
+cor_tree_trials <- c()\
+for(i in 1:100) \{\
+  df <- trial_dfs[[i]]\
+  cor_tree_trials[i] <- \
+\}\
+\
+cor_tree_trials\
+tree_fun(trial_dfs[[2]])\
+\
+trial_dfs <- list()\
+for(i in 1:364) \{\
+  trial_dfs[[i]] <- returns_df(final[days[[i]],])\
+\}\
+\
+trial_dfs[[2]]\
+\
+\
+\
+set.seed(1)\
+df_trial <- returns_df(final[days[[257]],])\
+train <- sample(1:nrow(df_trial), nrow(df_trial/2))\
+tree.trial <- tree(Asset_1_BRet_10f ~ Asset_3_BRet_10f + Asset_2_BRet_10f + Asset_1.x + Asset_3.x + Asset_2.x, df_trial)\
+cv.trial <- cv.tree(tree.trial)\
+tree.trial.final <- prune.tree(tree.trial, best=cv.trial$size[which.min(cv.trial$dev)])\
+\
+summary(tree.trial.final)\
+cor(predict(tree.trial.final) %>% as.vector, df_trial$Asset_1_BRet_10f)\
+\
+prediction <- function(df) \{\
+  lol <- final[days[[190]],] %>%\
+    mutate(t = 1:nrow(final[days[[190]],])) %>%\
+    as.tibble %>%\
+    mutate(t = ifelse(t + 10 < nrow(final[days[[190]],]), t + 10, nrow(final[days[[190]],]))) %>% # h = 10\
+    left_join(mutate(final[days[[190]],], t = 1:nrow(final[days[[190]],])), by="t") %>%\
+    mutate(Asset_1_BRet_10f = round((Asset_1.y - Asset_1.x)/Asset_1.x, 4),\
+           Asset_2_BRet_10f = round((Asset_2.y - Asset_2.x)/Asset_2.x, 4),\
+           Asset_3_BRet_10f = round((Asset_3.y - Asset_3.x)/Asset_3.x, 4)) %>%\
+    dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y) %>%\
+    mutate(t = 1:nrow(final[days[[190]],])) %>%\
+    mutate(t = ifelse(t - 10 < 1, 1, t-10)) %>%\
+    rename("Asset_1" = Asset_1.x, "Asset_2" = Asset_2.x, "Asset_3" = Asset_3.x) %>%\
+    left_join(mutate(final[days[[190]],], t = 1:nrow(final[days[[190]],])), by="t") %>%\
+    mutate(Asset_1_BRet_10b = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),\
+           Asset_2_BRet_10b = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),\
+           Asset_3_BRet_10b = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%\
+    dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y, -t) %>%\
+    as.tibble() %>%\
+    return()\
+  \
+  tree.trial <- tree(Asset_1_BRet_10f ~ Asset_3_BRet_10f + Asset_2_BRet_10f + Asset_1.x + Asset_3.x + Asset_2.x, lol)\
+  cv.trial <- cv.tree(tree.trial)\
+  tree.trial.final <- prune.tree(tree.trial, best=cv.trial$size[which.min(cv.trial$dev)])\
+  predict(tree.trial.final)[length(predict(tree.trial.final))] %>% as.vector\
+\}\
+\
+predict(final[days[[190]],])\
+\
+\
+\
+#####################\
+\
+\
+prediction <- function(dataframe) \{\
+  update <- dataframe %>%\
+    mutate(t = 1:nrow(dataframe)) %>%\
+    as.tibble %>%\
+    mutate(t = ifelse(t + 10 < nrow(dataframe), t + 10, nrow(dataframe))) %>% # h = 10\
+    left_join(mutate(dataframe, t = 1:nrow(df)), by="t") %>%\
+    mutate(Asset_1_BRet_10f = round((Asset_1.y - Asset_1.x)/Asset_1.x, 4),\
+           Asset_2_BRet_10f = round((Asset_2.y - Asset_2.x)/Asset_2.x, 4),\
+           Asset_3_BRet_10f = round((Asset_3.y - Asset_3.x)/Asset_3.x, 4)) %>%\
+    dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y) %>%\
+    mutate(t = 1:nrow(dataframe)) %>%\
+    mutate(t = ifelse(t - 10 < 1, 1, t-10)) %>%\
+    rename("Asset_1" = Asset_1.x, "Asset_2" = Asset_2.x, "Asset_3" = Asset_3.x) %>%\
+    left_join(mutate(dataframe, t = 1:nrow(df)), by="t") %>%\
+    mutate(Asset_1_BRet_10b = round((Asset_1.x - Asset_1.y)/Asset_1.y, 4),\
+           Asset_2_BRet_10b = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),\
+           Asset_3_BRet_10b = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%\
+    dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y, -t) %>%\
+    as.tibble()\
+  \
+  load("model.RData")\
+  predict(tree.trial.final)[length(predict(tree.trial.final))] %>% as.vector\
+\}\
+\
+\
+#######################\
+\
+tree.trial <- tree(Asset_1_BRet_10f ~ Asset_3_BRet_10f + Asset_2_BRet_10f + Asset_1.x + Asset_3.x + Asset_2.x, update)\
+cv.trial <- cv.tree(tree.trial)\
+tree.trial.final <- prune.tree(tree.trial, best=cv.trial$size[which.min(cv.trial$dev)])\
+\
+save(tree.trial, cv.trial, tree.trial.final, 'model.RData')\
+}
