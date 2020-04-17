@@ -122,7 +122,7 @@ f_10 <- final %>% mutate(t = ifelse(t + 10 < nrow(final), t + 10, nrow(final))) 
 
 # adding the 10 minute forward return of Asset 1 into bret data
 bret_2.3 <- BRet_full %>% mutate(Asset_1_BRet_10f = f_10$Asset_1_BRet_10f)
-
+bret_2.3 <- bret_2.3[days[[1]],]
 ### creating train and test df
 set.seed(816)
 train_id <- sample(1:nrow(bret_2.3), trunc(0.7*nrow(bret_2.3)))
@@ -218,6 +218,33 @@ for (i in 1:length(k_vals)) {
   knnTrainErr[i] <- mean((train2.3$Asset_1_BRet_10f - knn_pred_train$pred)^2)
   knnTestErr[i] <- mean((test2.3$Asset_1_BRet_10f - knn_pred_test$pred)^2)
 }
+
+plot(knnTrainErr ~ k_vals, type = "b", lwd = 2, col = "blue",
+     main = "Training and Validation MSE for KNN", xlab = "1/K", ylab = "MSE")
+lines(knnTestErr ~ k_vals, type = "b", lwd = 2, col = "red")
+abline(h = min(knnTrainErr), lty = 3, col = "blue")
+abline(h = min(knnTestErr), lty = 2, col = "red")
+
+legend("topright", legend = c("Training KNN", "Test KNN", "Lowest Training MSE", "Lowest Test MSE"),
+       cex = 0.75, col = c("blue", "red", "blue"," red"), lwd = c(2, 2, 1, 1),
+       pch = c(1, 1, NA, NA), lty = c(1, 1, 3, 2))
+
+min_train_K <- k_vals[which(knnTrainErr == min(knnTrainErr))]
+min_test_K <- k_vals[which(knnTestErr == min(knnTestErr))]
+
+knn_pred_train_best <- knn.reg(train = trainX2.4, 
+                          test = trainX2.4, 
+                          y = train2.3$Asset_1_BRet_10f, 
+                          k = min_test_K)
+knn_pred_test_best <- knn.reg(train = trainX2.4, 
+                         test = testX2.4, 
+                         y = train2.3$Asset_1_BRet_10f, 
+                         k = min_test_K)
+# in-sample correlation
+cor(train2.3$Asset_1_BRet_10f, knn_pred_train_best$pred)
+
+# out-of-sample correlation
+cor(test2.3$Asset_1_BRet_10f, knn_pred_test_best$pred)
 #################################################
 
 ##### Trying to make the KNN run faster
@@ -399,7 +426,7 @@ day1 <- final[days[[1]],] %>% mutate(t = 1:nrow(.))
 returns_df <- function(df) {
   df %>%
     mutate(t = 1:nrow(df)) %>%
-    as.tibble %>%
+    as_tibble %>%
     mutate(t = ifelse(t + 10 < nrow(df), t + 10, nrow(df))) %>% # h = 10
     left_join(mutate(df, t = 1:nrow(df)), by="t") %>%
     mutate(Asset_1_BRet_10f = round((Asset_1.y - Asset_1.x)/Asset_1.x, 4),
@@ -414,16 +441,19 @@ returns_df <- function(df) {
            Asset_2_BRet_10b = round((Asset_2.x - Asset_2.y)/Asset_2.y, 4),
            Asset_3_BRet_10b = round((Asset_3.x - Asset_3.y)/Asset_3.y, 4)) %>%
     dplyr::select(-Asset_1.y, -Asset_2.y, -Asset_3.y, -t) %>%
-    as.tibble() %>%
+    mutate(t = 1:nrow(df)) %>%
+    as_tibble() %>%
     return()
 }
+
+returns_df(final[days[[201]],])
 
 returns_df(final[days[[201]],]) %>%
   lm(Asset_1_BRet_10f ~ I(Asset_2_BRet_10f)*I(Asset_3_BRet_10f) + I(Asset_1_BRet_10b)*I(Asset_2_BRet_10b) +
        Asset_1.x*Asset_3.x, data=.) %>%
-  summary() %>%
+  summary()
   
-  returns_df(final[days[[190]],]) %>%
+returns_df(final[days[[203]],]) %>%
   ggplot(aes(x = t, y = Asset_1_BRet_10f)) +
   geom_line()
 
@@ -571,3 +601,121 @@ save(tree.trial, cv.trial, tree.trial.final, 'model.RData')
 library(tree)
 
 prediction(final[1:1440,])
+
+
+##########################
+
+#trial 1
+
+#forward plot
+returns_df(final[days[[290]],]) %>%
+  ggplot(aes(x = t, y = Asset_1_BRet_10f)) +
+  geom_line()
+
+# training
+df_290 <- returns_df(final[days[[290]],])
+train_id_290 <- seq(1, 0.7*nrow(df_290), by = 1) %>% as.integer()
+train_df_290 <- df_290[train_id_290,]
+test_df_290 <- df_290[-train_id_290,]
+
+library(tree)
+
+tree.trial.290 <- tree(Asset_1_BRet_10f ~ Asset_3_BRet_10f + Asset_2_BRet_10f + Asset_1.x + 
+                         Asset_3.x + Asset_2.x, train_df_290)
+cv.trial.290 <- cv.tree(tree.trial.290)
+tree.trial.final.290 <- prune.tree(tree.trial.290, 
+                                   best=cv.trial.290$size[which.min(cv.trial.290$dev)])
+summary(tree.trial.final.290) # used all
+cv.trial.290 #18
+
+test.290 <- mean((predict(tree.trial.final.290, test_df_290) - test_df_290$Asset_1_BRet_10f)^2)
+# 0.000008
+predict(tree.trial.final.290, test_df_290) %>% .[length(.)]
+cor(predict(tree.trial.final.290, test_df_290), test_df_290$Asset_1_BRet_10f)
+
+############################trial 2
+
+#forward plot
+returns_df(final[days[[37]],]) %>%
+  ggplot(aes(x = t, y = Asset_1_BRet_10f)) +
+  geom_line()
+
+# training
+df_37 <- returns_df(final[days[[37]],])
+train_id_37 <- seq(1, 0.7*nrow(df_37), by = 1) %>% as.integer()
+train_df_37 <- df_37[train_id_37,]
+test_df_37 <- df_37[-train_id_37,]
+
+library(tree)
+
+tree.trial.37 <- tree(Asset_1_BRet_10f ~ Asset_3_BRet_10f + Asset_2_BRet_10f + Asset_1.x + 
+                         Asset_3.x + Asset_2.x, train_df_37)
+cv.trial.37 <- cv.tree(tree.trial.37)
+tree.trial.final.37 <- prune.tree(tree.trial.37, 
+                                   best=cv.trial.37$size[which.min(cv.trial.37$dev)])
+summary(tree.trial.final.37) # used all
+cv.trial.37 #20
+
+test.37 <- mean((predict(tree.trial.final.37, test_df_37) - test_df_37$Asset_1_BRet_10f)^2)
+# 0.0000104
+predict(tree.trial.final.37, test_df_37) %>% .[length(.)]
+cor(predict(tree.trial.final.37, test_df_37), test_df_37$Asset_1_BRet_10f)
+# -0.00074
+
+############################trial 3
+
+#forward plot
+returns_df(final[days[[176]],]) %>%
+  ggplot(aes(x = t, y = Asset_1_BRet_10f)) +
+  geom_line()
+
+# training
+df_176 <- returns_df(final[days[[176]],])
+train_id_176 <- seq(1, 0.7*nrow(df_176), by = 1) %>% as.integer()
+train_df_176 <- df_176[train_id_176,]
+test_df_176 <- df_176[-train_id_176,]
+
+library(tree)
+
+tree.trial.176 <- tree(Asset_1_BRet_10f ~ Asset_3_BRet_10f + Asset_2_BRet_10f + Asset_1.x + 
+                        Asset_3.x + Asset_2.x, train_df_176)
+cv.trial.176 <- cv.tree(tree.trial.176)
+tree.trial.final.176 <- prune.tree(tree.trial.176, 
+                                  best=cv.trial.176$size[which.min(cv.trial.176$dev)])
+summary(tree.trial.final.176) # [1] "Asset_3_BRet_10f" "Asset_2.x"        "Asset_1.x"        "Asset_3.x"
+cv.trial.176 #10
+
+test.176 <- mean((predict(tree.trial.final.176, test_df_176) - test_df_176$Asset_1_BRet_10f)^2)
+#0.000006
+predict(tree.trial.final.176, test_df_176) %>% .[length(.)]
+cor(predict(tree.trial.final.176, test_df_176), test_df_176$Asset_1_BRet_10f)
+# 0.25076
+
+############################trial 4
+
+#forward plot
+returns_df(final[days[[315]],]) %>%
+  ggplot(aes(x = t, y = Asset_1_BRet_10f)) +
+  geom_line()
+
+# training
+df_315 <- returns_df(final[days[[315]],])
+train_id_315 <- seq(1, 0.7*nrow(df_315), by = 1) %>% as.integer()
+train_df_315 <- df_315[train_id_315,]
+test_df_315 <- df_315[-train_id_315,]
+
+library(tree)
+
+tree.trial.315 <- tree(Asset_1_BRet_10f ~ Asset_3_BRet_10f + Asset_2_BRet_10f + Asset_1.x + 
+                         Asset_3.x + Asset_2.x, train_df_315)
+cv.trial.315 <- cv.tree(tree.trial.315)
+tree.trial.final.315 <- prune.tree(tree.trial.315, 
+                                   best=cv.trial.315$size[which.min(cv.trial.315$dev)])
+summary(tree.trial.final.315) # [1] "Asset_3_BRet_10f" "Asset_2.x"        "Asset_1.x"        "Asset_3.x"
+cv.trial.315 #10
+
+test.315 <- mean((predict(tree.trial.final.315, test_df_315) - test_df_315$Asset_1_BRet_10f)^2)
+#0.000006
+predict(tree.trial.final.315, test_df_315) %>% .[length(.)]
+cor(predict(tree.trial.final.315, test_df_315), test_df_315$Asset_1_BRet_10f)
+# 0.25076
