@@ -85,32 +85,32 @@ final <- final %>% mutate(t = X + 1) %>% dplyr::select(-X)
 ### read in the resulting csv created from this code each time
 
 
-# Rho <- BRet_full %>%
-#  mutate(t = 1:nrow(.)) %>%
-#  dplyr::select(t, Asset_1_BRet_3, Asset_2_BRet_3, Asset_3_BRet_3)
+Rho <- BRet_full %>%
+ mutate(t = 1:nrow(.)) %>%
+ dplyr::select(t, Asset_1_BRet_3, Asset_2_BRet_3, Asset_3_BRet_3)
 
 
-# w = 21*24*60
-# Rho_1_2 <- vector(length = nrow(final))
-# Rho_1_3 <- vector(length = nrow(final))
-# Rho_2_3 <- vector(length = nrow(final))
+w = 21*24*60
+Rho_1_2 <- vector(length = nrow(final))
+Rho_1_3 <- vector(length = nrow(final))
+Rho_2_3 <- vector(length = nrow(final))
 
-# for(i in 1:nrow(BRet_full)){
-#  min_t = ifelse(Rho$t[i] - w < 1, 1, Rho$t[i] - w)
-#  max_t = Rho$t[i]
-# 
-#  Asset_1 <- Rho$Asset_1_BRet_3[min_t:max_t]
-#  Asset_2 <- Rho$Asset_2_BRet_3[min_t:max_t]
-#  Asset_3 <- Rho$Asset_3_BRet_3[min_t:max_t]
-# 
-#  Rho_1_2[i] <- round(cor(Asset_1, Asset_2), 4)
-#  Rho_1_3[i] <- round(cor(Asset_1, Asset_3), 4)
-#  Rho_2_3[i] <- round(cor(Asset_2, Asset_3), 4)
-# }
+for(i in 1:nrow(BRet_full)){
+ min_t = ifelse(Rho$t[i] - w < 1, 1, Rho$t[i] - w)
+ max_t = Rho$t[i]
 
-# Rho_corr <- tibble(Rho_1_2, Rho_1_3, Rho_2_3)
+ Asset_1 <- Rho$Asset_1_BRet_3[min_t:max_t]
+ Asset_2 <- Rho$Asset_2_BRet_3[min_t:max_t]
+ Asset_3 <- Rho$Asset_3_BRet_3[min_t:max_t]
 
-# write.csv(Rho_corr, 'corr.csv', row.names=FALSE)
+ Rho_1_2[i] <- round(cor(Asset_1, Asset_2), 4)
+ Rho_1_3[i] <- round(cor(Asset_1, Asset_3), 4)
+ Rho_2_3[i] <- round(cor(Asset_2, Asset_3), 4)
+}
+
+Rho_corr <- tibble(Rho_1_2, Rho_1_3, Rho_2_3)
+
+write.csv(Rho_corr, 'corr.csv', row.names=FALSE)
 
 
 
@@ -366,6 +366,9 @@ lasso.pred_test = predict(lasso.mod,newx=X[-train_id,])
 val_MSEs_lasso <- lapply(1:86, function(i) mean((lasso.pred_test[,i]-y[-train_id])^2))
 
 best_lambda_lasso = lasso.mod$lambda[which.min(val_MSEs_lasso)]
+
+lasso.coef = predict(lasso.mod, type="coefficients", s=best_lambda_lasso)
+lasso.coef
 
 # in-sample correlation
 cor(y[train_id], predict(lasso.mod, s=best_lambda_lasso, newx=X[train_id,]))
